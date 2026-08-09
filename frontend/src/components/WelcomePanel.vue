@@ -5,20 +5,17 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: "WelcomePanel",
-  props: {
-    // title + lines 的结构很适合做可配置空状态：
-    // 不同模式只要传不同文案，就能复用同一套组件。
-    title: {
-      type: String,
-      default: "",
-    },
-    lines: {
-      type: Array,
-      default: () => [],
-    },
+<script setup>
+// 一个可配置的空状态组件。
+// title 和 lines 都由父组件传入，所以不同页面可以复用它来展示自己的引导文案。
+defineProps({
+  title: {
+    type: String,
+    default: "",
   },
-};
+  lines: {
+    type: Array,
+    default: () => [],
+  },
+});
 </script>

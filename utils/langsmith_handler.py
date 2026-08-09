@@ -53,9 +53,9 @@ def configure_langsmith(
 
 def get_langsmith_settings_from_env() -> dict:
     return {
-        "enabled": _normalize_bool(os.getenv("LANGSMITH_TRACING", "false")),
-        "api_key": os.getenv("LANGSMITH_API_KEY", ""),
-        "project": os.getenv("LANGSMITH_PROJECT", "interview-coach-debug"),
+        "enabled": _normalize_bool(os.getenv("LANGSMITH_TRACING") or os.getenv("LANGCHAIN_TRACING_V2", "false")),
+        "api_key": os.getenv("LANGSMITH_API_KEY") or os.getenv("LANGCHAIN_API_KEY", ""),
+        "project": os.getenv("LANGSMITH_PROJECT") or os.getenv("LANGCHAIN_PROJECT", "interview-coach-debug"),
         "endpoint": os.getenv("LANGSMITH_ENDPOINT", DEFAULT_LANGSMITH_ENDPOINT),
     }
 

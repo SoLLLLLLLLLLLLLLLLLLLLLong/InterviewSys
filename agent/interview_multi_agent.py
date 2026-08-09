@@ -362,7 +362,8 @@ class InterviewAgent:
 4. 如果 stage 是 follow_up，要围绕 followup_focus 深挖，不要突然跳题
 5. 如果 stage 是 next_question，要明显切到新的能力维度，避免继续纠缠上一个点
 6. 如果有简历分析，优先结合简历里的项目、职责、技术选型和结果来问
-7. 只输出问题本身，不要输出解释、评分或前置说明
+7. 如果有后台题库参考，可以参考它的考察方向，但不要机械照抄，仍然要结合上下文自然提问
+8. 只输出问题本身，不要输出解释、评分或前置说明
 
 岗位：
 {role}
@@ -393,6 +394,9 @@ class InterviewAgent:
 
 建议追问点：
 {followup_focus}
+
+后台题库参考：
+{question_bank}
 
 最近对话：
 {history}
@@ -437,6 +441,7 @@ class InterviewAgent:
         question_index: int,
         resume_analysis: dict[str, Any] | None = None,
         evaluation_result: dict[str, Any] | None = None,
+        on_token: Callable[[str], None] | None = None,
     ) -> str:
         dimension_name = self.role_manager.get_dimension_name(role, question_index)
         dimension_focus = self.role_manager.get_dimension_focus(role, question_index)
@@ -444,23 +449,33 @@ class InterviewAgent:
         resume_focuses = "；".join((resume_analysis or {}).get("recommended_focuses", [])[:4]) or "无"
         evaluation_summary = str((evaluation_result or {}).get("reason", "")).strip() or "暂无"
         followup_focus = str((evaluation_result or {}).get("followup_focus", "")).strip() or "关键实现"
+        question_bank = "\n".join(self.role_manager.get_reference_questions(role, question_index)) or "无"
 
         try:
-            question = self.question_chain.invoke(
-                {
-                    "role": role or "通用技术岗位",
-                    "stage": stage,
-                    "dimension_name": dimension_name,
-                    "dimension_focus": dimension_focus,
-                    "resume_summary": _trim_text(resume_summary, 800),
-                    "resume_focuses": resume_focuses,
-                    "current_question": current_question or "无",
-                    "user_input": user_input or "无",
-                    "evaluation_summary": evaluation_summary,
-                    "followup_focus": followup_focus,
-                    "history": _history_to_text(history),
-                }
-            )
+            prompt_payload = {
+                "role": role or "通用技术岗位",
+                "stage": stage,
+                "dimension_name": dimension_name,
+                "dimension_focus": dimension_focus,
+                "resume_summary": _trim_text(resume_summary, 800),
+                "resume_focuses": resume_focuses,
+                "current_question": current_question or "无",
+                "user_input": user_input or "无",
+                "evaluation_summary": evaluation_summary,
+                "followup_focus": followup_focus,
+                "question_bank": question_bank,
+                "history": _history_to_text(history),
+            }
+            if on_token:
+                parts = []
+                for chunk in self.question_chain.stream(prompt_payload):
+                    text_chunk = str(chunk or "")
+                    if text_chunk:
+                        parts.append(text_chunk)
+                        on_token(text_chunk)
+                question = "".join(parts)
+            else:
+                question = self.question_chain.invoke(prompt_payload)
             text = str(question or "").strip()
             if text:
                 return text
@@ -479,17 +494,26 @@ class InterviewAgent:
         current_question: str,
         history: Sequence[dict],
         evaluation_result: dict[str, Any] | None = None,
+        on_token: Callable[[str], None] | None = None,
     ) -> str:
         weaknesses = "；".join((evaluation_result or {}).get("weaknesses", [])[:3]) or "可以从原理、流程、案例和结果几个角度展开"
         try:
-            hint = self.hint_chain.invoke(
-                {
-                    "current_question": current_question or "暂无当前问题",
-                    "user_input": user_input or "无",
-                    "weaknesses": weaknesses,
-                    "history": _history_to_text(history, max_turns=6),
-                }
-            )
+            prompt_payload = {
+                "current_question": current_question or "暂无当前问题",
+                "user_input": user_input or "无",
+                "weaknesses": weaknesses,
+                "history": _history_to_text(history, max_turns=6),
+            }
+            if on_token:
+                parts = []
+                for chunk in self.hint_chain.stream(prompt_payload):
+                    text_chunk = str(chunk or "")
+                    if text_chunk:
+                        parts.append(text_chunk)
+                        on_token(text_chunk)
+                hint = "".join(parts)
+            else:
+                hint = self.hint_chain.invoke(prompt_payload)
             text = str(hint or "").strip()
             if text:
                 return text

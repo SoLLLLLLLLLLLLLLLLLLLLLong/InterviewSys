@@ -87,6 +87,44 @@ class InterviewRoleManager:
             return self.DEFAULT_ROLE
         return text
 
+    def set_runtime_profile(
+        self,
+        role: str,
+        dimensions: List[dict] | None = None,
+        keywords: List[str] | None = None,
+        question_bank: List[dict] | None = None,
+    ) -> None:
+        """Register a role profile loaded from the platform admin/interviewer console."""
+        normalized = self.normalize_role(role)
+        clean_dimensions = []
+        for item in dimensions or []:
+            name = str(item.get("name", "")).strip()
+            focus = str(item.get("focus", "")).strip()
+            if name:
+                clean_dimensions.append({"name": name, "focus": focus or f"{name} 相关能力与项目经验"})
+        if not clean_dimensions:
+            seen_dimensions = set()
+            for item in question_bank or []:
+                name = str(item.get("dimension", "")).strip()
+                if name and name not in seen_dimensions:
+                    seen_dimensions.add(name)
+                    clean_dimensions.append({"name": name, "focus": f"{name} 相关能力、项目经验与问题解决思路"})
+        if not clean_dimensions:
+            clean_dimensions = [{"name": normalized, "focus": f"{normalized} 岗位核心能力与项目落地经验"}]
+        self.ROLE_PROFILES[normalized] = {
+            "keywords": [str(item).strip() for item in keywords or [] if str(item).strip()] or [normalized],
+            "dimensions": clean_dimensions,
+            "question_bank": [
+                {
+                    "dimension": str(item.get("dimension", "")).strip(),
+                    "difficulty": str(item.get("difficulty", "")).strip(),
+                    "question_text": str(item.get("question_text", "")).strip(),
+                }
+                for item in question_bank or []
+                if str(item.get("question_text", "")).strip()
+            ],
+        }
+
     def get_role_profile(self, role: str) -> Dict:
         normalized = self.normalize_role(role)
         for key, profile in self.ROLE_PROFILES.items():
@@ -112,6 +150,19 @@ class InterviewRoleManager:
 
     def get_dimension_focus(self, role: str, index: int) -> str:
         return str(self.get_dimension(role, index).get("focus", "项目经验、技术理解和落地能力"))
+
+    def get_reference_questions(self, role: str, index: int, limit: int = 3) -> List[str]:
+        """Return interviewer-configured question-bank references for the current turn."""
+        questions = list(self.get_role_profile(role).get("question_bank", []))
+        if not questions:
+            return []
+        start = max(0, index) % len(questions)
+        ordered = questions[start:] + questions[:start]
+        return [
+            f"{item.get('dimension') or '综合'}：{item.get('question_text')}"
+            for item in ordered[: max(1, limit)]
+            if str(item.get("question_text", "")).strip()
+        ]
 
     def get_first_question(self, role: str) -> str:
         return "先从你最有代表性的项目开始吧。你在这个项目里负责的核心工作和最终结果分别是什么？"

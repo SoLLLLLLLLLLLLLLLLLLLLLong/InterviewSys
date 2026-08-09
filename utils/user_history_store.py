@@ -152,8 +152,6 @@ def _normalize_workspace_state(raw_state: dict[str, Any] | None) -> dict[str, An
             }
             project["conversations"].append(conversation)
 
-        if not project["conversations"]:
-            project["conversations"].append(_create_conversation())
         workspace["projects"].append(project)
 
     if not workspace["projects"]:
@@ -168,11 +166,19 @@ def _normalize_workspace_state(raw_state: dict[str, Any] | None) -> dict[str, An
         workspace["active_project_id"] = active_project["id"]
 
     if not workspace["active_conversation_id"]:
-        workspace["active_conversation_id"] = active_project["conversations"][0]["id"]
+        for project in workspace["projects"]:
+            if project.get("conversations"):
+                workspace["active_conversation_id"] = project["conversations"][0]["id"]
+                break
 
     active_conversation = get_conversation_by_id(workspace, workspace["active_conversation_id"])
     if not active_conversation:
-        workspace["active_conversation_id"] = active_project["conversations"][0]["id"]
+        for project in workspace["projects"]:
+            if project.get("conversations"):
+                workspace["active_conversation_id"] = project["conversations"][0]["id"]
+                break
+        else:
+            return create_default_workspace_state()
 
     return workspace
 

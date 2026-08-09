@@ -1,15 +1,32 @@
 from datetime import datetime
+from contextlib import contextmanager
+from contextvars import ContextVar
 import csv
+import json
 import os
+import re
+import uuid
 
 import requests
 from langchain_core.tools import tool
 
 from utils.config_handler import agent_conf
 from utils.path_tool import get_abs_path
+from agent.interview_role_manager import InterviewRoleManager
 
 
 _rag_service = None
+_tool_context: ContextVar[dict] = ContextVar("agent_tool_context", default={})
+
+
+@contextmanager
+def tool_tenant_context(context: dict | None):
+    """Bind trusted request context for tools without exposing it to the model."""
+    token = _tool_context.set(dict(context or {}))
+    try:
+        yield
+    finally:
+        _tool_context.reset(token)
 
 
 def _get_rag_service():
@@ -65,6 +82,20 @@ def rag_summarize(query: str):
     return _get_rag_service().rag_summarize(query)
 
 
+@tool("knowledge_search")
+def knowledge_search(query: str):
+    """检索本地知识库并返回带来源编号的相关证据。"""
+    context = _tool_context.get()
+    result = _get_rag_service().search_with_citations(
+        query,
+        filters={"user_id": context.get("user_id"), "organization_id": context.get("organization_id")},
+    )
+    citations = result["citations"]
+    if not citations:
+        return "知识库中没有找到足够相关的资料。"
+    return json.dumps({"query": query, "citations": citations}, ensure_ascii=False)
+
+
 @tool
 def get_weather(city: str):
     """查询指定城市的天气，以字符串形式返回。"""
@@ -112,6 +143,54 @@ def get_weather(city: str):
         return f"{target_city}天气查询失败：{error_message or '请求天气接口失败'}"
     except Exception:
         return f"{target_city}天气查询失败，请稍后重试。"
+
+
+@tool("weather_search")
+def weather_search(city: str):
+    """查询指定城市的实时天气；只有天气相关问题才使用此工具。"""
+    return get_weather.invoke({"city": city})
+
+
+@tool("resume_lookup")
+def resume_lookup(resume_text: str, keyword: str = ""):
+    """从当前简历文本中提取与关键词相关的项目或技能片段。"""
+    # Prefer the server-side resume from the authenticated conversation. The
+    # model-provided argument remains only for compatibility with the tool schema.
+    content = str(_tool_context.get().get("resume_text") or resume_text or "").strip()
+    if not content:
+        return "当前会话没有上传简历。"
+    if not keyword.strip():
+        return content[:1200]
+    fragments = [item.strip() for item in re.split(r"[。！？\n]", content) if keyword.lower() in item.lower()]
+    return "\n".join(fragments[:8]) or f"简历中没有找到与“{keyword}”直接匹配的内容。"
+
+
+@tool("question_search")
+def question_search(role: str, question_index: int = 0):
+    """按岗位和题目序号查询建议考察维度，帮助规划面试问题。"""
+    manager = InterviewRoleManager()
+    index = max(0, int(question_index))
+    return json.dumps(
+        {
+            "role": role,
+            "dimension": manager.get_dimension_name(role, index),
+            "focus": manager.get_dimension_focus(role, index),
+        },
+        ensure_ascii=False,
+    )
+
+
+@tool("save_report")
+def save_report(title: str, content: str):
+    """把已经生成的报告保存为 Markdown 文件并返回文件名。"""
+    safe_title = re.sub(r"[^\w\u4e00-\u9fff-]+", "_", title or "agent_report").strip("_")
+    filename = f"{safe_title or 'agent_report'}_{uuid.uuid4().hex[:8]}.md"
+    report_dir = get_abs_path("data/tool_reports")
+    os.makedirs(report_dir, exist_ok=True)
+    file_path = os.path.join(report_dir, filename)
+    with open(file_path, "w", encoding="utf-8") as file:
+        file.write(str(content or ""))
+    return filename
 
 
 @tool

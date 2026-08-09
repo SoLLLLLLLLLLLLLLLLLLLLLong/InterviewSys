@@ -8,17 +8,18 @@ import {
   createDefaultWorkspace,
 } from "../types/app.js";
 
-// 页面模式统一枚举，避免散落字符串。
-// 统一常量的价值：
-// 1. 减少魔法字符串
-// 2. 让页面层、状态层、接口层共用同一套业务词汇
+// 统一常量的好处：
+// 1. 避免到处散落魔法字符串
+// 2. 页面层、状态层、接口层共用同一套业务枚举
+// 3. 后续修改字段名或文案时更容易集中维护
 export const MODES = {
   QA: "qa",
   INTERVIEW: "interview",
   HISTORY: "history",
 };
 
-// 常见加载动作统一收口，便于按钮状态和日志跟踪共用。
+// 当前正在执行的加载动作。
+// 页面会根据它控制按钮禁用、loading 文案和错误提示。
 export const LOADING_ACTIONS = {
   LOGIN: "login",
   REGISTER: "register",
@@ -56,12 +57,17 @@ export const THEME_LABELS = {
   },
 };
 
+// 流式接口支持的动作类型：
+// - send：正常发送
+// - resume：继续生成
+// - retry：重试本轮回答
 export const STREAM_ACTIONS = {
   SEND: "send",
   RESUME: "resume",
   RETRY: "retry",
 };
 
+// 消息在前端展示时的状态。
 export const MESSAGE_STATUS = {
   DONE: "done",
   GENERATING: "generating",

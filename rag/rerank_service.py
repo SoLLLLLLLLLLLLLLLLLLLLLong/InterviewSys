@@ -36,7 +36,10 @@ class RerankService:
             for item in response.output.results or []:
                 idx = int(item.index)
                 if 0 <= idx < len(docs):
-                    result_docs.append(docs[idx])
+                    document = docs[idx]
+                    metadata = dict(document.metadata or {})
+                    metadata["rerank_score"] = round(float(getattr(item, "relevance_score", 0.0) or 0.0), 6)
+                    result_docs.append(Document(page_content=document.page_content, metadata=metadata))
 
             return result_docs if result_docs else docs[: self.top_k]
         except Exception as e:

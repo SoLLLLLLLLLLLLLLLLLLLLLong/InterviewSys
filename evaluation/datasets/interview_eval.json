@@ -1,0 +1,8 @@
+[
+  {"id":"route-001","category":"router","input":"我不会，能给点提示吗","expected":"give_hint"},
+  {"id":"route-002","category":"router","input":"今天先到这里吧","expected":"finish_interview"},
+  {"id":"route-003","category":"router","input":"Redis AOF 会记录每条写命令，并可通过重写压缩日志","expected":"evaluate_answer"},
+  {"id":"tool-001","category":"tool","input":"广州今天天气怎么样","expected":"weather_search"},
+  {"id":"tool-002","category":"tool","input":"根据知识库解释 Redis 持久化","expected":"knowledge_search"},
+  {"id":"quality-001","category":"interview","dimensions":["项目经历","基础原理","工程实践","系统设计"],"questions":["介绍代表项目","解释响应式原理","如何联调接口","如何设计状态管理"]}
+]

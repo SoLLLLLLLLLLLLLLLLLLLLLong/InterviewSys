@@ -1,10 +1,10 @@
 /**
- * 这份文件用来集中描述前端里最常见的数据结构。
- * 当前项目还是 JavaScript，没有切到 TypeScript，
- * 所以这里用 JSDoc + 工厂函数的方式，先把“结构定义”统一起来。
+ * 这个文件集中描述前端里最常见的数据结构。
  *
- * 学习时可以把这里当成“前端数据字典”：
- * 页面上常见的对象长什么样，先在这里统一约定。
+ * 当前项目还是 JavaScript，没有切到 TypeScript，
+ * 所以这里用 JSDoc + 默认值工厂函数的方式，先把“对象大概长什么样”统一下来。
+ *
+ * 你可以把它理解成前端的数据字典。
  */
 
 /**
@@ -49,19 +49,6 @@
  */
 
 /**
- * @typedef {Object} HistoryRecord
- * @property {number} id
- * @property {string} role_name
- * @property {string} resume_filename
- * @property {number} score
- * @property {string} created_at
- * @property {string} updated_at
- * @property {string} [report_text]
- * @property {ChatMessage[]} [history]
- * @property {Record<string, any>} [interview_state]
- */
-
-/**
  * @typedef {Object} WorkspaceConversation
  * @property {string} id
  * @property {string} name
@@ -85,8 +72,6 @@
  */
 
 export function createDefaultAuth() {
-  // 默认值工厂函数：
-  // 登录态重置、页面初始渲染时都会复用。
   return {
     authenticated: false,
     user: null,

@@ -13,20 +13,17 @@
   </section>
 </template>
 
-<script>
-export default {
-  name: "PanelSkeleton",
-  props: {
-    // rows 控制骨架屏里模拟多少条聊天消息，
-    // compact 控制是否使用更紧凑的占位布局。
-    rows: {
-      type: Number,
-      default: 4,
-    },
-    compact: {
-      type: Boolean,
-      default: false,
-    },
+<script setup>
+defineProps({
+  // rows 控制骨架屏里模拟多少条消息。
+  // compact 用来控制是否采用更紧凑的占位布局。
+  rows: {
+    type: Number,
+    default: 4,
   },
-};
+  compact: {
+    type: Boolean,
+    default: false,
+  },
+});
 </script>

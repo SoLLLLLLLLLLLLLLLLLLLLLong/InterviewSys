@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from utils.path_tool import get_abs_path
+from infrastructure.database import platform_database_enabled
 
 
 DB_PATH = get_abs_path("data/app.db")
@@ -78,6 +79,11 @@ def create_user(email: str, display_name: str, password: str) -> dict[str, Any]:
     password_hash = _hash_password(password, salt)
     created_at = datetime.now().isoformat()
 
+    if platform_database_enabled():
+        from infrastructure.postgres_auth import create_user as pg_create_user
+
+        return pg_create_user(normalized_email, normalized_name, password_hash, salt)
+
     try:
         with _get_connection() as conn:
             cursor = conn.execute(
@@ -102,6 +108,16 @@ def create_user(email: str, display_name: str, password: str) -> dict[str, Any]:
 def verify_user(email: str, password: str) -> dict[str, Any] | None:
     # 登录校验：根据邮箱查用户，再重新计算输入密码的哈希做比对。
     normalized_email = (email or "").strip().lower()
+    if platform_database_enabled():
+        from infrastructure.postgres_auth import find_user_by_email
+
+        row = find_user_by_email(normalized_email)
+        if not row:
+            return None
+        actual_hash = _hash_password(password, row["password_salt"])
+        if not hmac.compare_digest(row["password_hash"], actual_hash):
+            return None
+        return {key: value for key, value in row.items() if key not in {"password_hash", "password_salt"}}
     with _get_connection() as conn:
         row = conn.execute("SELECT * FROM users WHERE email = ?", (normalized_email,)).fetchone()
     if not row:
@@ -125,6 +141,11 @@ def create_session(user_id: int) -> str:
     token = secrets.token_urlsafe(32)
     now = datetime.now()
     expires_at = (now + timedelta(days=SESSION_EXPIRE_DAYS)).isoformat()
+    if platform_database_enabled():
+        from infrastructure.postgres_auth import create_session as pg_create_session
+
+        pg_create_session(user_id, token, datetime.fromisoformat(expires_at))
+        return token
     with _get_connection() as conn:
         conn.execute("DELETE FROM user_sessions WHERE expires_at < ?", (now.isoformat(),))
         conn.execute(
@@ -141,6 +162,11 @@ def delete_session(token: str) -> None:
     # 退出登录的本质就是删掉对应的会话记录。
     if not token:
         return
+    if platform_database_enabled():
+        from infrastructure.postgres_auth import delete_session as pg_delete_session
+
+        pg_delete_session(token)
+        return
     with _get_connection() as conn:
         conn.execute("DELETE FROM user_sessions WHERE session_token = ?", (token,))
 
@@ -149,6 +175,10 @@ def get_user_by_session(token: str) -> dict[str, Any] | None:
     # 根据浏览器 Cookie 里的 session_token 反查当前用户。
     if not token:
         return None
+    if platform_database_enabled():
+        from infrastructure.postgres_auth import get_user_by_session as pg_get_user_by_session
+
+        return pg_get_user_by_session(token)
     now_iso = datetime.now().isoformat()
     with _get_connection() as conn:
         row = conn.execute(
@@ -183,6 +213,19 @@ def create_interview_record(
 ) -> int:
     # 把一轮面试结果落成历史记录，供历史列表/恢复/下载使用。
     now = datetime.now().isoformat()
+    if platform_database_enabled():
+        from infrastructure.postgres_auth import create_interview_record as pg_create_interview_record
+
+        return pg_create_interview_record(
+            user_id=user_id,
+            role_name=role_name,
+            resume_filename=resume_filename,
+            score=score,
+            report_text=report_text,
+            report_file=report_file,
+            history_json=history_json,
+            interview_state_json=interview_state_json,
+        )
     with _get_connection() as conn:
         cursor = conn.execute(
             """
@@ -210,6 +253,10 @@ def create_interview_record(
 
 def list_interview_records(user_id: int) -> list[dict[str, Any]]:
     # 返回历史列表页需要的摘要数据。
+    if platform_database_enabled():
+        from infrastructure.postgres_auth import list_interview_records as pg_list_interview_records
+
+        return pg_list_interview_records(user_id)
     with _get_connection() as conn:
         rows = conn.execute(
             """
@@ -236,6 +283,10 @@ def list_interview_records(user_id: int) -> list[dict[str, Any]]:
 
 def get_interview_record(user_id: int, record_id: int) -> dict[str, Any] | None:
     # 返回单条完整记录，给历史详情和恢复逻辑使用。
+    if platform_database_enabled():
+        from infrastructure.postgres_auth import get_interview_record as pg_get_interview_record
+
+        return pg_get_interview_record(user_id, record_id)
     with _get_connection() as conn:
         row = conn.execute(
             """

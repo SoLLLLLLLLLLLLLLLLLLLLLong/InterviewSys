@@ -1,10 +1,9 @@
 <template>
   <section class="history-shell">
-    <!-- 左侧：历史记录列表 -->
     <div class="history-list-card">
       <div class="history-header">
         <h2>历史面试记录</h2>
-        <button class="ghost-button compact-button" :disabled="loadingAction === 'history'" @click="$emit('refresh-history')">
+        <button class="ghost-button compact-button" :disabled="loadingAction === 'history'" @click="emit('refresh-history')">
           {{ loadingAction === "history" ? "刷新中..." : "刷新列表" }}
         </button>
       </div>
@@ -21,7 +20,7 @@
           v-for="record in records"
           :key="record.id"
           :class="['history-item', selectedRecord?.id === record.id ? 'active' : '']"
-          @click="$emit('open-record', record.id)"
+          @click="emit('open-record', record.id)"
         >
           <div class="history-item-top">
             <strong>{{ record.role_name || "未命名岗位" }}</strong>
@@ -35,8 +34,6 @@
       </div>
     </div>
 
-    <!-- 右侧：当前选中记录的详情
-         包括报告正文、历史对话、恢复按钮、下载按钮。 -->
     <div class="history-detail-card">
       <PanelSkeleton v-if="loadingAction === 'history' && !selectedRecord" :rows="4" />
 
@@ -49,7 +46,7 @@
         <div class="history-header">
           <h2>{{ selectedRecord.role_name }}</h2>
           <div class="history-actions">
-            <button class="ghost-button compact-button" @click="$emit('restore-record', selectedRecord.id)">恢复到当前会话</button>
+            <button class="ghost-button compact-button" @click="emit('restore-record', selectedRecord.id)">恢复到当前会话</button>
             <a class="text-button" :href="`/api/history/interviews/${selectedRecord.id}/download`" download>下载报告</a>
           </div>
         </div>
@@ -61,43 +58,35 @@
         </div>
 
         <article class="report-content history-report">{{ selectedRecord.report_text }}</article>
-        <!-- 历史记录详情也复用 ChatHistory，说明该组件是通用消息渲染层。 -->
+
+        <!-- 历史详情和正常聊天区都复用 ChatHistory，
+             说明这个组件已经被抽成了通用消息渲染层。 -->
         <ChatHistory :messages="selectedRecord.history || []" />
       </template>
     </div>
   </section>
 </template>
 
-<script>
-// 历史记录面板：
-// 1. 左侧列表展示历史面试摘要
-// 2. 右侧查看报告详情和完整对话
-// 3. 支持恢复到当前工作台继续复盘
-// 这里体现的是一个很典型的“主从视图”设计：
-// 左侧选中某条记录，右侧展示对应详情。
+<script setup>
 import ChatHistory from "./ChatHistory.vue";
 import PanelSkeleton from "./PanelSkeleton.vue";
 
-export default {
-  name: "HistoryPanel",
-  components: {
-    ChatHistory,
-    PanelSkeleton,
+defineProps({
+  records: {
+    type: Array,
+    default: () => [],
   },
-  props: {
-    records: {
-      type: Array,
-      default: () => [],
-    },
-    selectedRecord: {
-      type: Object,
-      default: null,
-    },
-    loadingAction: {
-      type: String,
-      default: "",
-    },
+  selectedRecord: {
+    type: Object,
+    default: null,
   },
-  emits: ["refresh-history", "open-record", "restore-record"],
-};
+  loadingAction: {
+    type: String,
+    default: "",
+  },
+});
+
+// 这是一个典型的“主从视图”：
+// 左侧是记录列表，右侧是当前记录详情。
+const emit = defineEmits(["refresh-history", "open-record", "restore-record"]);
 </script>
